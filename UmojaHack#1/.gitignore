@@ -106,5 +106,8 @@ venv.bak/
 # vscode
 .vscode/
 
+# Jetbrains
+# .idea/
+# Data
 Processed/
 Raw/
