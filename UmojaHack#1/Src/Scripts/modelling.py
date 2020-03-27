@@ -1,10 +1,13 @@
 import numpy as np
 from keras.preprocessing.image import ImageDataGenerator
 from keras.models import Sequential
-from keras.layers import (Activation, AveragePooling2D,
-                          BatchNormalization, Convolution2D,
+from keras.layers import (Activation, AveragePooling2D, Flatten, InputLayer,
+                          BatchNormalization, Convolution2D, Dense, MaxPooling2D,
                           Dropout, GlobalAveragePooling2D)
 from keras.utils.np_utils import to_categorical
+from keras.applications import InceptionV3
+from keras.callbacks import TensorBoard, ModelCheckpoint
+import time
 import matplotlib.pyplot as plt
 
 top_model_model_path = '../../Output/Models/model.h5'
@@ -12,7 +15,7 @@ top_model_weights_path = '../../Output/Models/weights.h5'
 train_data_path = '../../Data/Processed/Train'
 validation_data_path = '../../Data/Processed/Val'
 img_width, img_height = 512, 384
-epochs = 50
+epochs = 100
 batch_size = 8
 
 
@@ -29,7 +32,7 @@ def train():
     num_classes = len(generator.class_indices)
 
     # load the bottleneck features saved earlier
-    train_data = np.load('bottleneck_features_train.npy')
+    train_data = np.load('../../Output/Models/bottleneck_features_train.npy')
 
     # get the class labels for the training data, in the original order
     train_labels = generator.classes
@@ -44,7 +47,7 @@ def train():
         class_mode=None,
         shuffle=False)
 
-    validation_data = np.load('bottleneck_features_validation.npy')
+    validation_data = np.load('../../Output/Models/bottleneck_features_validation.npy')
 
     validation_labels = generator.classes
     validation_labels = to_categorical(validation_labels, num_classes=num_classes)
@@ -55,46 +58,53 @@ def train():
     # model = Model(new)
     # image_features_extract_model = tf.keras.Model(new_input, hidden_layer)
 
-    model = Sequential()
-    model.add(Convolution2D(filters=16, kernel_size=(7, 7), padding='same', name='image_array', input_shape=train_data.shape[1:]))
-    model.add(BatchNormalization())
-    model.add(Convolution2D(filters=16, kernel_size=(7, 7), padding='same'))
-    model.add(BatchNormalization())
-    model.add(Activation('relu'))
-    model.add(AveragePooling2D(pool_size=(2, 2), padding='same'))
-    model.add(Dropout(.5))
-    model.add(Convolution2D(filters=32, kernel_size=(5, 5), padding='same'))
-    model.add(BatchNormalization())
-    model.add(Convolution2D(filters=32, kernel_size=(5, 5), padding='same'))
-    model.add(BatchNormalization())
-    model.add(Activation('relu'))
-    model.add(AveragePooling2D(pool_size=(2, 2), padding='same'))
-    model.add(Dropout(.5))
-    model.add(Convolution2D(filters=64, kernel_size=(3, 3), padding='same'))
-    model.add(BatchNormalization())
-    model.add(Convolution2D(filters=64, kernel_size=(3, 3), padding='same'))
-    model.add(BatchNormalization())
-    model.add(Activation('relu'))
-    model.add(AveragePooling2D(pool_size=(2, 2), padding='same'))
-    model.add(Dropout(.5))
-    model.add(Convolution2D(filters=128, kernel_size=(3, 3), padding='same'))
-    model.add(BatchNormalization())
-    model.add(Convolution2D(filters=128, kernel_size=(3, 3), padding='same'))
-    model.add(BatchNormalization())
-    model.add(Activation('relu'))
-    model.add(AveragePooling2D(pool_size=(2, 2), padding='same'))
-    model.add(Dropout(.5))
-    model.add(Convolution2D(filters=256, kernel_size=(3, 3), padding='same'))
-    model.add(BatchNormalization())
-    model.add(Convolution2D(filters=num_classes, kernel_size=(3, 3), padding='same'))
-    model.add(GlobalAveragePooling2D())
-    model.add(Activation('softmax', name='predictions'))
+    pool_size = (2, 2)
 
-    model.compile(optimizer='rmsprop', loss='categorical_crossentropy', metrics=['accuracy'])
+    hidden_num_units = 50
+    output_num_units = 10
+    input_num_units = 784
+    hidden1_num_units = 500
+    hidden2_num_units = 500
+    hidden3_num_units = 500
+    hidden4_num_units = 500
+    hidden5_num_units = 500
+    output_num_units = 10
+    print(train_data.shape)
+    model = Sequential([
+        Dense(output_dim=hidden1_num_units, input_dim=train_data.shape[1:], activation='relu'),
+        Dropout(0.2),
+        Dense(output_dim=hidden2_num_units, input_dim=hidden1_num_units, activation='relu'),
+        Dropout(0.2),
+        Dense(output_dim=hidden3_num_units, input_dim=hidden2_num_units, activation='relu'),
+        Dropout(0.2),
+        Dense(output_dim=hidden4_num_units, input_dim=hidden3_num_units, activation='relu'),
+        Dropout(0.2),
+        Dense(output_dim=hidden5_num_units, input_dim=hidden4_num_units, activation='relu'),
+        Dropout(0.2),
+
+        Dense(output_dim=output_num_units, input_dim=hidden5_num_units, activation='softmax'),
+    ])
+
+    model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
+
+    # model.add(Convolution2D(filters=num_classes, kernel_size=(3, 3), padding='same'))
+    # model.add(GlobalAveragePooling2D())
+    # model.add(Activation('softmax', name='predictions'))
+
+    # model.compile(optimizer='rmsprop', loss='categorical_crossentropy', metrics=['accuracy'])
+
+    tensorboard = TensorBoard(log_dir="logs/{}".format(time.time()))
+    filepath = "model-{epoch:02d}.h5"
+    checkpoint = ModelCheckpoint(filepath, period=10)
+
+    # train the network
+    print("[INFO] training network...")
 
     history = model.fit(train_data, train_labels,
                         epochs=epochs,
                         batch_size=batch_size,
+                        verbose=1,
+                        callbacks=[tensorboard, checkpoint],
                         validation_data=(validation_data, validation_labels))
 
     model.save_weights(top_model_weights_path)
