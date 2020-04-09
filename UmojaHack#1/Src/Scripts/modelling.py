@@ -2,7 +2,7 @@ import cv2
 import os
 from tqdm import tqdm
 import time
-
+import pickle
 import matplotlib.pyplot as plt
 import numpy as np
 from imutils import paths
@@ -50,7 +50,7 @@ def load_data(dir_path, split=True):
     print("[INFO] Converting images to array...")
     for imagePath in tqdm(imagepaths):
         image = cv2.imread(imagePath)
-        # image = cv2.resize(image, (img_height, img_width))
+        image = cv2.resize(image, (img_height, img_width))
         image = img_to_array(image)
         data.append(image)
 
@@ -147,5 +147,8 @@ def make_plot(history):
 if __name__ == "__main__":
     xtrain, ytrain, xtest, ytest = load_data(train_data_path, split=True)
     xval, yval = load_data(validation_data_path, split=False)
+    trainfiles = open("../../Output/Models/trainfiles.pickle", "wb")
+    pickle.dump([xtrain, ytrain, xtest, ytest, xval, yval], trainfiles)
+    trainfiles.close()
     history = train(xtrain, ytrain, xtest, ytest, xval, yval)
     make_plot(history)
